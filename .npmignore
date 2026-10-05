@@ -1,9 +1,0 @@
-.DS_Store
-.git/
-.gitignore
-.planning/
-.pi/gsd/
-node_modules/
-tests/
-*.log
-*.tgz

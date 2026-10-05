@@ -1,268 +1,125 @@
-# pi-discord-activity
+# pi-discord-presence (Pi-Bolt build)
 
-A repo-ready package for adding **Discord activity** support to the **Pi coding agent**.
+> **Discord Rich Presence for Pi-Bolt.** It shows what the
+> agent is doing on your behalf, live.
 
-This project is split into two pieces:
+This is a Pi-Bolt–specific fork of
+[gwynnnplaine/pi-discord-presence](https://github.com/gwynnnplaine/pi-discord-presence).
 
-- a **Pi extension** that listens to real Pi session and activity events
-- a **local helper daemon** that owns the Discord RPC connection and updates your Discord activity
+## Why this fork exists
 
-## What this starter pack includes
+Upstream talks to Discord through `@xhayper/discord-rpc`. Its dependency
+`@vladfrangu/async_event_emitter` bundles `node-inspect-extracted`, which throws
+at module load under Pi-Bolt's runtime (Bun, JIT off, jiti loader):
 
-- `package.json`
-- TypeScript build config
-- Pi extension implementation in `src/extension`
-- Discord helper implementation in `src/helper`
-- shared types/config in `src/shared`
-- example local settings in `.pi/example-settings.json`
-- install, setup, service, and verification docs
+```
+Error: Failed to load extension ".../pi-discord-presence/index.ts":
+Failed to load extension: Attempted to assign to readonly property.
+```
 
-## Quick Start
+The same import works under plain `node`/`bun`, so the failure is specific to
+Pi-Bolt. This fork replaces `src/transport.ts` with a zero-dependency client that
+speaks Discord's local IPC protocol directly over `node:net`. Everything else is
+upstream code, unchanged apart from the transport factory name.
 
-### Published package install
+Side effects of the rewrite:
 
-For most users, the simplest path is to install the published package into Pi and let the extension auto-start the helper when Pi activity is first published.
+- **No runtime dependencies** — nothing to `npm install`.
+- **No helper process** — unlike the older `pi-discord-activity`, nothing is
+  spawned, so no orphaned/zombie helpers are left behind.
 
-1. **Install the Pi package**
+Tested on Pi-Bolt 0.7.0 (pi 1.0.3, darwin-arm64). Stock pi with a Node runtime
+should also work, but use upstream there.
 
-   ```bash
-   pi install npm:pi-discord-activity
-   ```
+## What it shows
 
-2. **Open Pi and use it normally**
+`Editing foo.tsx` · `Running: git` · `Searching the codebase` · `Thinking…` ·
+`Idle in dotfiles` — with the project, the model, and a session-elapsed timer.
 
-   With the default configuration, the extension will auto-start the helper the first time it needs to publish Discord activity.
+| Pi activity                    | Shows as                  |
+| ------------------------------ | ------------------------- |
+| `edit` / `write` a file        | `Editing foo.tsx`         |
+| `read` a file                  | `Reading foo.tsx`         |
+| `grep` / `glob` / search       | `Searching the codebase`  |
+| `web_search` / `fetch`         | `Browsing the web`        |
+| `bash`                         | `Running: <first token>`  |
+| any other tool                 | `Running <toolName>`      |
+| generating a response          | `Thinking…`               |
+| waiting for you                | `Idle in <project>`       |
 
-3. **Verify the integration**
+The second line is `project · model`. The large image is the PI logo; the small
+badge is the file's language icon.
 
-   Follow [docs/verification.md](./docs/verification.md) for the Discord-side checks.
+## Install (Pi-Bolt)
 
-If you prefer explicit process management, you can still start the helper manually:
+Clone into Pi-Bolt's global extension directory, which is auto-discovered:
 
 ```bash
-pi-discord-activity-helper
-# or
-npx pi-discord-activity-helper
+git clone git@github.com:nathannli/Pi-Discord-Activity.git \
+  ~/.pi/agent/extensions/pi-discord-presence
 ```
 
-### Direct npm install
-
-If you want the helper binary available directly from npm on your PATH:
+Or try it for one session without installing:
 
 ```bash
-npm install -g pi-discord-activity
+pi-bolt -e /absolute/path/to/Pi-Discord-Activity/index.ts
 ```
 
-You should still install the Pi package so Pi loads the extension:
+If you previously installed upstream, remove `npm:@gwynnnplaine/pi-discord-presence`
+from the `packages` list in `~/.pi/agent/settings.json`; otherwise Pi-Bolt keeps
+failing to start with the error above.
 
-```bash
-pi install npm:pi-discord-activity
+## Discord app
+
+Works out of the box against the default **Pi** application
+(`defaults.json`). To use your own name and art, create a Discord application
+and set its client ID in the config below.
+
+## Config
+
+Global `~/.pi/agent/discord-presence.json`:
+
+```json
+{ "enabled": true, "clientId": "1520833162148712580" }
 ```
 
-Then either let Pi auto-start the helper, or run it yourself:
+Per-project `<repo>/.pi/discord-presence.json` (honored only when the project is
+trusted) — silence a sensitive repo:
 
-```bash
-pi-discord-activity-helper
+```json
+{ "enabled": false }
 ```
 
-### Local repo / development install
+Runtime: `/presence on`, `/presence off`, `/presence status`
+(session-only). Precedence: **runtime > project > global**.
 
-1. **Configure Discord (optional)**
+## Behavior
 
-   The package already ships with a working default Discord application ID, so custom setup is optional.
+- **Active only in interactive TUI mode** (not `-p` / json one-shot runs).
+- **Rate limit**: Discord caps presence at ~1 update / 15s. Updates are
+  coalesced to the latest state with a trailing flush.
+- **Privacy**: on by default; filenames + project name are broadcast. Disable
+  globally, per-project, or at runtime. No filename ever leaks from `bash` args
+  (only the first token is shown).
+- **Multiple Pi sessions** share one Discord slot — last writer wins.
+- **Discord not running**: connection fails silently and is retried lazily.
 
-   ```bash
-   # optional: override the built-in default app
-   export DISCORD_RPC_CLIENT_ID="your_discord_client_id"
-   ```
+## Layout
 
-   For a custom Discord application, see [docs/discord-setup.md](./docs/discord-setup.md).
-
-2. **Install dependencies and build**
-
-   ```bash
-   npm install
-   npm run build
-   ```
-
-3. **Install the Pi extension**
-
-   ```bash
-   pi install .
-   ```
-
-   Manual fallback:
-
-   ```bash
-   mkdir -p ~/.pi/agent/extensions
-   ln -s "$(pwd)/dist/extension/index.js" ~/.pi/agent/extensions/pi-discord-activity.js
-   ```
-
-4. **Start Pi and let the helper auto-start**
-
-   The extension will start the helper automatically on the first publish attempt. If you prefer to run it yourself during development, you can still use:
-
-   ```bash
-   npm start
-   ```
-
-5. **Verify the integration**
-
-   ```bash
-   ./scripts/verify-installation.sh
-   ```
-
-   Then follow [docs/verification.md](./docs/verification.md) for the manual Discord-side checks.
-
-## Status
-
-This is a working Pi extension/helper package with:
-
-- ✅ real Pi extension integration
-- ✅ Discord activity transport and reconnect handling
-- ✅ a built-in default Discord application ID for low-friction setup
-- ✅ `pi install .` package installation support
-- ✅ setup, service, and verification documentation
-
-Typical next steps for a new user:
-
-1. follow [INSTALL.md](./INSTALL.md)
-2. optionally configure a custom Discord application
-3. optionally set up a background service using [docs/service-recipes.md](./docs/service-recipes.md)
-4. verify the full flow with [docs/verification.md](./docs/verification.md)
-
-## Requirements
-
-- Node.js 20+
-- npm 10+
-- Discord desktop app running locally
-- Pi coding agent installed locally
-
-## Install
-
-For the full guided flow, see [INSTALL.md](./INSTALL.md).
-
-### Install from the published package
-
-Recommended for most users:
-
-```bash
-pi install npm:pi-discord-activity
 ```
-
-Then open Pi and let the extension auto-start the helper on first use.
-
-Manual helper startup is still available if you want it:
-
-```bash
-pi-discord-activity-helper
-# or
-npx pi-discord-activity-helper
+index.ts            re-exports the entry
+src/result.ts       Result / ok / err
+src/types.ts        branded types, Activity union, configs, errors, constructors
+src/language.ts     extension → language-icon map
+src/activity.ts     event reducer (reduce / toActivity / classifyTool)
+src/render.ts       Activity → PresenceCard → wire payload
+src/config.ts       parse + load config, resolveEnablement
+src/scheduler.ts    Clock + coalesce/trailing-flush rate limiter
+src/transport.ts    DiscordTransport seam + direct Discord IPC client (fork change)
+src/link.ts         connection state machine + lazy reconnect
+src/extension.ts    wires Pi events → reducer → scheduler
 ```
-
-If you want the helper installed globally through npm as well:
-
-```bash
-npm install -g pi-discord-activity
-```
-
-### Install from the local repo
-
-```bash
-npm install
-npm run build
-pi install .
-```
-
-Then open Pi and let the extension auto-start the helper, or run `npm start` manually if you prefer.
-
-### Guided setup scripts
-
-The repo also includes automation scripts that can write `.env`, build the project, optionally run `pi install .`, and create a background service:
-
-```bash
-./setup.sh
-# or on Windows
-pwsh ./setup.ps1
-```
-
-## Local development
-
-Run the helper daemon:
-
-```bash
-npm run dev:helper
-```
-
-In another terminal, build and install the extension or use `pi install .` again after making changes.
-
-If you want to test the HTTP transport without Pi, keep the helper running and POST a payload to:
-
-```text
-http://127.0.0.1:42666/presence
-```
-
-## Environment variables
-
-The package ships with a built-in default Discord RPC client ID:
-
-- `1495329514417426522`
-
-So `DISCORD_RPC_CLIENT_ID` is optional for normal use. The helper also reads `.env` and `.env.local` from the project root.
-
-Common configuration:
-
-```dotenv
-DISCORD_RPC_CLIENT_ID=1495329514417426522
-PI_PRESENCE_PORT=42666
-PI_PRESENCE_HOST=127.0.0.1
-PI_PRESENCE_PRIVACY_MODE=true
-PI_PRESENCE_INCLUDE_PROJECT=false
-PI_PRESENCE_DEBOUNCE_MS=2000
-PI_PRESENCE_AUTOSTART_HELPER=true
-PI_PRESENCE_DEBUG=false
-```
-
-Set `PI_PRESENCE_AUTOSTART_HELPER=false` if you want to disable auto-start and manage the helper manually or through an OS service.
-
-### Privacy defaults
-
-Default behavior is privacy-first:
-
-- project name is hidden unless explicitly enabled
-- prompt content is never sent to Discord
-- filenames are not sent to Discord
-
-To allow project names in the Discord state line, set both:
-
-```bash
-export PI_PRESENCE_PRIVACY_MODE="false"
-export PI_PRESENCE_INCLUDE_PROJECT="true"
-```
-
-## Example Discord activity mapping
-
-- **Details**: `Using Pi Coding Agent`
-- **State**: `<model> • <activity>`
-- **Large image**: `pi`
-- **Small image**: provider key such as `openai`
-
-Common activities:
-
-- `Starting`
-- `Thinking`
-- `Running Tools`
-- `Editing Files`
-- `Idle`
-- `Error`
-
-## Documentation
-
-- [INSTALL.md](./INSTALL.md) — full installation guide
-- [docs/discord-setup.md](./docs/discord-setup.md) — custom Discord application setup
-- [docs/service-recipes.md](./docs/service-recipes.md) — macOS, Linux, and Windows service recipes
-- [docs/verification.md](./docs/verification.md) — manual verification flow and troubleshooting
 
 ## License
 
-MIT
+MIT — original work © gwynnnplaine. See [LICENSE](LICENSE).
