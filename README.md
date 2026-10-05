@@ -52,17 +52,21 @@ badge is the file's language icon.
 
 ## Install (Pi-Bolt)
 
-Clone into Pi-Bolt's global extension directory, which is auto-discovered:
-
 ```bash
-git clone git@github.com:nathannli/Pi-Discord-Activity.git \
-  ~/.pi/agent/extensions/pi-discord-presence
+pi-bolt install git:github.com/nathannli/Pi-Discord-Activity
+# or, project-local only:
+pi-bolt install git:github.com/nathannli/Pi-Discord-Activity -l
 ```
+
+Update later with `pi-bolt update git:github.com/nathannli/Pi-Discord-Activity`.
+Remove with
+`pi-bolt remove git:github.com/nathannli/Pi-Discord-Activity`.
 
 Or try it for one session without installing:
 
 ```bash
-pi-bolt -e /absolute/path/to/Pi-Discord-Activity/index.ts
+git clone https://github.com/nathannli/Pi-Discord-Activity.git
+pi-bolt -e "$PWD/Pi-Discord-Activity/index.ts"
 ```
 
 If you previously installed upstream, remove `npm:@gwynnnplaine/pi-discord-presence`
