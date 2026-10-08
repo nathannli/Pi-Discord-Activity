@@ -76,15 +76,30 @@ failing to start with the error above.
 ## Discord app
 
 Works out of the box against the default **Pi** application
-(`defaults.json`). To use your own name and art, create a Discord application
-and set its client ID in the config below.
+(`defaults.json`). Discord takes the displayed activity name from the application
+associated with the client ID, not from the local activity text.
+
+To display **Pi-Bolt**, use the Pi-Bolt application ID shown in the global config
+below. This configuration has been verified with Discord desktop running.
+Restart Pi-Bolt after changing the config.
+
+To use your own application name and art:
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
+2. Select **New Application**, name it **Pi-Bolt** (or your preferred name), and create it.
+3. Under **General Information**, copy the **Application ID** and use it as `clientId`.
+4. Under **Rich Presence → Art Assets**, upload a logo named **`pi_logo`** and save changes.
+5. Restart Pi-Bolt with Discord desktop running. New art assets may take time to appear.
+
+No bot or server invite is required. The Application ID is public; do not use a
+bot token or client secret.
 
 ## Config
 
 Global `~/.pi/agent/discord-presence.json`:
 
 ```json
-{ "enabled": true, "clientId": "1520833162148712580" }
+{ "enabled": true, "clientId": "1557577584110215258" }
 ```
 
 Per-project `<repo>/.pi/discord-presence.json` (honored only when the project is
