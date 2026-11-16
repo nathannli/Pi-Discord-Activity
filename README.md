@@ -6,6 +6,13 @@
 This is a Pi-Bolt–specific fork of
 [gwynnnplaine/pi-discord-presence](https://github.com/gwynnnplaine/pi-discord-presence).
 
+## Differences from plain Pi
+
+- **Runtime:** this build runs on **Pi-Bolt** (the `pi-bolt` command), not plain
+  Pi (the stock `pi` command). Install and start it with `pi-bolt`, as shown below.
+- **Logo:** the Discord large image is the **Pi-Bolt logo**, not the stock pi logo.
+  The logo is uploaded as the `pi_logo` art asset in the Pi-Bolt Discord application.
+
 ## Why this fork exists
 
 Upstream talks to Discord through `@xhayper/discord-rpc`. Its dependency
@@ -28,7 +35,7 @@ Side effects of the rewrite:
 - **No helper process** — unlike the older `pi-discord-activity`, nothing is
   spawned, so no orphaned/zombie helpers are left behind.
 
-Tested on Pi-Bolt 0.7.0 (pi 1.0.3, darwin-arm64). Stock pi with a Node runtime
+Tested on Pi-Bolt 1.2.1 (pi 1.5.2, darwin-arm64). Stock pi with a Node runtime
 should also work, but use upstream there.
 
 ## What it shows
@@ -47,8 +54,8 @@ should also work, but use upstream there.
 | generating a response          | `Thinking…`               |
 | waiting for you                | `Idle in <project>`       |
 
-The second line is `project · model`. The large image is the PI logo; the small
-badge is the file's language icon.
+The second line is `project · model`. The large image is the Pi-Bolt logo (not the
+stock pi logo); the small badge is the file's language icon.
 
 ## Install (Pi-Bolt)
 
